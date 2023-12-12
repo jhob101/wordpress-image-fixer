@@ -1,3 +1,4 @@
 /wp-content/
 /tmp/
 output*.txt
+/.idea/
