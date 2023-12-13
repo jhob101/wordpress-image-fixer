@@ -125,9 +125,10 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
     try:
         with Image.open(file_name) as img:
             width, height = img.size
+            aspect_ratio = width / height
 
             # only proceed if the image is >= 600 along the longest edge
-            if max(width, height) >= 600:
+            if max(width, height) >= 600 and aspect_ratio > 0.5 and aspect_ratio < 2:
                 new_size = (width * upscale_factor, height * upscale_factor)
                 upscaled_img = img.resize(new_size, Image.BICUBIC)  # Bicubic interpolation
 
@@ -211,4 +212,4 @@ def main(bucket_name):
 
 
 if __name__ == "__main__":
-    main("your-s3-bucket")
+    main("jadore-models")
