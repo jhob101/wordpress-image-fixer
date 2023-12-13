@@ -10,6 +10,12 @@ https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html
 aws configure
 ```
 
+## Install dependencies
+
+```
+pip install pillow boto3
+```
+
 ## Change chosen bucket name in main.py
 
 Then run it!
