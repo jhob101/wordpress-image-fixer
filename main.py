@@ -211,4 +211,4 @@ def main(bucket_name):
 
 
 if __name__ == "__main__":
-    main("jadore-models")
+    main("your-s3-bucket")
