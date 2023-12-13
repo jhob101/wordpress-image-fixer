@@ -159,7 +159,7 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
 
                 os.remove(base_image_name)  # Delete the upscaled image
             else:
-                logger.info("Image size is less than 600 along its longest edge. Upscaling not performed.")
+                logger.info(f"Image size is less than 600 along its longest edge. Upscaling not performed. W: {width}, H: {height}, AR: {aspect_ratio}")
 
     except UnidentifiedImageError:
         logger.info(
