@@ -128,21 +128,7 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
 
             # only proceed if the image is >= 600 along the longest edge
             if max(width, height) >= 600:
-
-                MAX_RESOLUTION = 2560
-                aspect_ratio = width / height
-
-                if aspect_ratio > 1:
-                    # Width is longer edge
-                    new_width = min(width * upscale_factor, MAX_RESOLUTION)
-                    new_height = int(new_width / aspect_ratio)
-                else:
-                    # Height is longer edge or edges are equal
-                    new_height = min(height * upscale_factor, MAX_RESOLUTION)
-                    new_width = int(new_height * aspect_ratio)
-
-                new_size = (new_width, new_height)
-
+                new_size = (width * upscale_factor, height * upscale_factor)
                 upscaled_img = img.resize(new_size, Image.BICUBIC)  # Bicubic interpolation
 
                 if object_exists(s3_client, bucket_name, base_image_name):  # If base image exists
