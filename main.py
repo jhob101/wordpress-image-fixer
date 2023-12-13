@@ -137,6 +137,7 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
                     s3_client.download_file(bucket_name, base_image_name, temp_file_name)  # Download it
                     with Image.open(temp_file_name) as existing_img:  # Open it
                         ex_width, ex_height = existing_img.size  # Get its size
+                        ex_aspect_ratio = ex_width / ex_height  # Get its aspect ratio
                         existing_img.close()
 
                         try:
@@ -144,7 +145,7 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
                         except Exception as e:
                             logger.info(f"Error removing temp file {temp_file_name}: {e}")
 
-                        if (ex_width * ex_height) > (width * height):  # If it's bigger
+                        if ((ex_width * ex_height) > (width * height)) or (((ex_width >= 2560) or (ex_height >=2560)) and ((ex_aspect_ratio > 0.5) or (ex_aspect_ratio <= 2))):  # If it's bigger or big enough
                             logger.info("Existing base image size is larger. Skipping the upscaling.")
                             return
 
