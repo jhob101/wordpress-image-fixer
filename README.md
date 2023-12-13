@@ -16,8 +16,14 @@ aws configure
 pip install pillow boto3
 ```
 
-## Change chosen bucket name in main.py
+## Run it!
+Either change chosen bucket name in main.py
 
-Then run it!
+or run
+
+```
+cd wordpress-image-fixer
+python main.py your-s3-bucket
+```
 
 Can probably be relatively easily adapted to work with the normal wordpress uploads directory.
