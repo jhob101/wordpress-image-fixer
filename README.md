@@ -5,6 +5,7 @@ If original image is missing, re-generates it from the largest resized image.  F
 https://aws.amazon.com/cli/
 
 ### Configure CLI with credentials
+https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html
 ```
 aws configure
 ```
