@@ -202,7 +202,10 @@ def main(bucket_name):
 
                     if largest_file_area != 0:
                         logger.info(f"Upscaling image {largest_file}")
-                        upscale_image(s3_client, bucket_name, largest_file, base_image_name)
+                        try:
+                            upscale_image(s3_client, bucket_name, largest_file, base_image_name)
+                        except Exception as e:
+                            logger.info(f"Error upscaling image {largest_file}: {e}")
 
             logger.info("-----------------")
 
