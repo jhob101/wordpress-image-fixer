@@ -13,14 +13,58 @@ def get_basename(filename):
     "Extracts base part of filename without -size suffix"
     return filename.rsplit('-', 1)[0]
 
-def get_images(s3, bucket_name):
-    "Fetches list of objects in S3"
-    try:
-        files = s3.list_objects(Bucket=bucket_name)['Contents']
-    except NoCredentialsError:
-        print("No AWS credentials were found.")
 
-    return files
+def get_images(s3, bucket_name, batch_size=5000):
+    "Fetches and processes objects in an S3 bucket in batches, and saves the last processed key in a file."
+    try:
+        # Read the last processed key from a file if it exists
+        try:
+            with open("last_key.txt", "r") as file:
+                last_key = file.read().strip()
+        except FileNotFoundError:
+            last_key = None
+
+        # Start from the last processed key if it exists, otherwise fetch the first batch of objects
+        if last_key:
+            response = s3.list_objects(Bucket=bucket_name, Marker=last_key)
+        else:
+            response = s3.list_objects(Bucket=bucket_name)
+
+        file_keys = []
+        while response:
+            file_keys.extend(response['Contents'])
+
+            # process current batch if the size limit has been reached
+            if len(file_keys) >= batch_size:
+                # store the last processed key in a file
+                with open("last_key.txt", "w") as file:
+                    file.write(file_keys[-1]['Key'])
+
+                print(f"Batch of {len(file_keys)} images in the bucket {bucket_name}")
+                return file_keys
+
+            # Check if 'IsTruncated' is true in response, then the request is paginated
+            if response['IsTruncated']:
+                response = s3.list_objects(Bucket=bucket_name, Marker=file_keys[-1]['Key'])
+            else:
+                response = None
+
+        # process remaining files in the last batch
+        if file_keys:
+            # store the last processed key in a file
+            with open("last_key.txt", "w") as file:
+                file.write(file_keys[-1]['Key'])
+
+            print(f"Final batch of {len(file_keys)} images in the bucket {bucket_name}")
+            return file_keys
+        else:  # No files found
+            return None
+
+
+    except NoCredentialsError:
+        print("Credentials not available")
+        return None
+
 
 def get_image_area(image):
     # Extract the size information from the filename
@@ -30,8 +74,9 @@ def get_image_area(image):
         # Return the area
         return width * height
     except ValueError:
-        #print(f"Invalid size info '{size_info}' in image filename '{image}'. Skipping")
+        # print(f"Invalid size info '{size_info}' in image filename '{image}'. Skipping")
         return 0
+
 
 def object_exists(s3_client, bucket_name, obj_key):
     try:
@@ -42,6 +87,7 @@ def object_exists(s3_client, bucket_name, obj_key):
             return False
     # If the object does exist
     return True
+
 
 def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_factor=2):
     # Download the image for processing
@@ -68,6 +114,12 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
                     with Image.open(temp_file_name) as existing_img:  # Open it
                         ex_width, ex_height = existing_img.size  # Get its size
                         existing_img.close()
+
+                        try:
+                            os.remove(temp_file_name)  # Delete the temp file
+                        except Exception as e:
+                            print(f"Error removing temp file {temp_file_name}: {e}")
+
                         if (ex_width * ex_height) > (width * height):  # If it's bigger
                             print("Existing base image size is larger. Skipping the upscaling.")
                             return
@@ -79,26 +131,36 @@ def upscale_image(s3_client, bucket_name, src_image, base_image_name, upscale_fa
 
                 print(f"Uploading upscaled image {base_image_name} to {bucket_name}/{base_image_name}")
                 s3_client.upload_file(Filename=base_image_name, Bucket=bucket_name, Key=base_image_name)
+
+                os.remove(base_image_name)  # Delete the upscaled image
             else:
                 print("Image size is less than 600 along its longest edge. Upscaling not performed.")
 
     except UnidentifiedImageError:
-        print(f"Unable to identify image {file_name}. It might not be an image or is unsupported/corrupt. Please check the file.")
+        print(
+            f"Unable to identify image {file_name}. It might not be an image or is unsupported/corrupt. Please check the file.")
         return
 
+    finally:
+        # Delete the downloaded image
+        os.remove(file_name)
+
+
 def main(bucket_name):
-    original_stdout = sys.stdout  # Save a reference to the original standard output
-    original_stderr = sys.stderr  # Save a reference to the original standard error output
+    # original_stdout = sys.stdout  # Save a reference to the original standard output
+    # original_stderr = sys.stderr  # Save a reference to the original standard error output
 
-    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-    output_filename = f"output_{timestamp}.txt"
+    # timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    # output_filename = f"output_{timestamp}.txt"
 
-    with open(output_filename, 'w') as f:
-        sys.stdout = f  # Change the standard output to the file we created.
-        sys.stderr = f  # Change the standard error output to the file we created.
-        s3_client = boto3.client('s3')
+    # with open(output_filename, 'w') as f:
+    # sys.stdout = f  # Change the standard output to the file we created.
+    # sys.stderr = f  # Change the standard error output to the file we created.
+    s3_client = boto3.client('s3')
 
-        images = get_images(s3_client, bucket_name)
+    images = get_images(s3_client, bucket_name)
+
+    while images:
         images_data = {}
         for image in images:
             key = image['Key']
@@ -110,7 +172,6 @@ def main(bucket_name):
                     images_data[basename] = [key]
 
         for base, variants in images_data.items():
-
             variants_without_base = [x for x in variants if get_basename(x) == base]
             if variants_without_base:
                 largest_file = max(variants_without_base, key=get_image_area)
@@ -127,5 +188,9 @@ def main(bucket_name):
                         upscale_image(s3_client, bucket_name, largest_file, base_image_name)
 
             print("-----------------")
+
+        images = get_images(s3_client, bucket_name)
+
+
 if __name__ == "__main__":
-    main("image-fixer-bucket")
+    main("jadore-models")
